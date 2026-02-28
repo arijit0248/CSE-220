@@ -3,6 +3,7 @@ from tkinter import filedialog, messagebox
 import numpy as np
 import scipy.io.wavfile as wav
 import sounddevice as sd
+import threading
 from discrete_framework import DFTAnalyzer, FastFourierTransform, DiscreteSignal
 
 
@@ -103,50 +104,53 @@ class AudioEqualizer:
         # Get Slider Values
         gains = [s.get() for s in self.sliders]
 
-        if self.use_fft.get():
-            analyzer = FastFourierTransform()
-            chunkSize = 2048
-        else:
-            analyzer = DFTAnalyzer()
-            chunkSize = 1024
+        def worker():
+            if self.use_fft.get():
+                analyzer = FastFourierTransform()
+                chunkSize = 2048
+            else:
+                analyzer = DFTAnalyzer()
+                chunkSize = 1024
 
-        audio = self.original_audio
-        totalSamples = len(audio)
-        output = np.zeros(totalSamples, dtype=np.float32)
-        bandIndices = self.getBandIndices(chunkSize, self.samplerate)
-        currPos = 0
-        while currPos < totalSamples:
-            end = min(chunkSize+currPos, totalSamples)
-            chunk = audio[currPos:end].astype(np.complex128)
+            audio = self.original_audio
+            totalSamples = len(audio)
+            output = np.zeros(totalSamples, dtype=np.float32)
+            bandIndices = self.getBandIndices(chunkSize, self.samplerate)
+            currPos = 0
+            while currPos < totalSamples:
+                end = min(chunkSize+currPos, totalSamples)
+                chunk = audio[currPos:end].astype(np.complex128)
 
-            actualLen = len(chunk)
-            if actualLen < chunkSize:
-                chunk = np.pad(chunk, (0, chunkSize-actualLen))
-            signal = DiscreteSignal(chunk)
-            spectrum = analyzer.compute_dft(signal)
+                actualLen = len(chunk)
+                if actualLen < chunkSize:
+                    chunk = np.pad(chunk, (0, chunkSize-actualLen))
+                signal = DiscreteSignal(chunk)
+                spectrum = analyzer.compute_dft(signal)
 
-            filtered = spectrum.copy()
-            for bandIndex, (low, high) in enumerate(bandIndices):
-                gain = gains[bandIndex]
-                filtered[low:high] *= gain
-                if low > 0:
-                    filtered[chunkSize-high:chunkSize-low] *= gain
+                filtered = spectrum.copy()
+                for bandIndex, (low, high) in enumerate(bandIndices):
+                    gain = gains[bandIndex]
+                    filtered[low:high] *= gain
+                    if low > 0:
+                        filtered[chunkSize-high:chunkSize-low] *= gain
 
-            reconstructed = analyzer.compute_idft(filtered)
-            outputChunk = reconstructed.real[:actualLen].astype(np.float32)
-            output[currPos:currPos+actualLen] = outputChunk
+                reconstructed = analyzer.compute_idft(filtered)
+                outputChunk = reconstructed.real[:actualLen].astype(np.float32)
+                output[currPos:currPos+actualLen] = outputChunk
 
-            currPos += chunkSize
+                currPos += chunkSize
 
-        maxVal = np.max(np.abs(output))
-        if maxVal > 1.0:
-            output /= maxVal
+            maxVal = np.max(np.abs(output))
+            if maxVal > 1.0:
+                output /= maxVal
 
-        self.processed_audio = output
+            self.processed_audio = output
 
-        sd.stop()
-        default_output = sd.default.device[0]
-        sd.play(self.processed_audio, self.samplerate, device=default_output)
+            sd.stop()
+            default_output = sd.default.device[0]
+            sd.play(self.processed_audio.reshape(-1),
+                    self.samplerate)
+        threading.Thread(target=worker, daemon=True).start()
 
 
 if __name__ == "__main__":

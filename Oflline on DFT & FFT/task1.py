@@ -1,6 +1,5 @@
 import tkinter as tk
 import numpy as np
-import math
 from discrete_framework import DiscreteSignal, DFTAnalyzer, FastFourierTransform
 
 
@@ -81,15 +80,25 @@ class DoodlingApp:
         self.canvas.create_oval(
             x-radius, y-radius, x+radius, y+radius, outline="blue", tags="epicycle")
 
+    def draw_original(self):
+        if len(self.points) < 2:
+            return
+        for i in range(1, len(self.points)):
+            x0, y0 = self.points[i-1]
+            x1, y1 = self.points[i]
+            self.canvas.create_line(
+                x0, y0, x1, y1, fill="black", width=2, tags="original")
+
     def run_transform(self):
         if len(self.points) < 2:
             return
 
         # TODO: Implementation
         # 1. Convert (x,y) points to Complex Signal
-        complexData = np.array(
+        complexRawData = np.array(
             [x+1j*y for x, y in self.points], dtype=np.complex128)
-        complexData = complexData - np.mean(complexData)
+        mean = np.mean(complexRawData)
+        complexData = complexRawData - mean
         signal = DiscreteSignal(complexData)
         # 2. Select Algorithm
         if self.use_fft.get():
@@ -98,28 +107,31 @@ class DoodlingApp:
             power = 1
             while power < N:
                 power <<= 1
-            if power != N:
-                signal = signal.interpolate(power)
+            signal = signal.interpolate(power)
+
         else:
             analyzer = DFTAnalyzer()
         # 3. Compute Transform
         self.fourier_coeffs = analyzer.compute_dft(signal)
-        self.num_frames = len(self.fourier_coeffs)
+        N = len(self.fourier_coeffs)
+        self.num_frames = N
+
+        freqs = np.array(
+            [k if k <= N//2 else k-N for k in range(N)], dtype=np.int64)
 
         order = np.argsort(-np.abs(self.fourier_coeffs))
         self.sortedCoeffs = self.fourier_coeffs[order]
-        self.sortedFreqs = order
+        self.sortedFreqs = freqs[order]
 
         # setting canvas center
-        xs = [p[0] for p in self.points]
-        ys = [p[1] for p in self.points]
-        centerX = (min(xs) + max(xs)) / 2
-        centerY = (min(ys) + max(ys)) / 2
-        self.center_offset = (centerX, centerY)
+        self.center_offset = (mean.real, mean.imag)
 
         # canvas clearing for animation
-        self.canvas.delete("all")
+        # Keep the original drawing visible
+        self.canvas.delete("epicycle")
+        self.canvas.delete("path")
         self.pathPoints = []
+        self.draw_original()
         self.animate_epicycles(self.center_offset)
 
     def animate_epicycles(self, center_offset):
@@ -141,7 +153,7 @@ class DoodlingApp:
 
         cx, cy = self.center_offset
 
-        for i, (coeff, freq) in enumerate(zip(self.sortedCoeffs, self.sortedFreqs)):
+        for coeff, freq in zip(self.sortedCoeffs, self.sortedFreqs):
             radius = np.abs(coeff)/N
             if radius < .5:
                 continue

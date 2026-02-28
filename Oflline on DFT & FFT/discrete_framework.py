@@ -32,10 +32,16 @@ class DiscreteSignal:
         Required for Task 4 (Drawing App).
         """
         currentLength = len(self.data)
-        oldIndices = np.linspace(0, currentLength-1, currentLength)
-        newIndices = np.linspace(0, currentLength-1, new_length)
-        realInterpolated = np.interp(newIndices, oldIndices, self.data.real)
-        imagInterpolated = np.interp(newIndices, oldIndices, self.data.imag)
+        if currentLength == 0:
+            return DiscreteSignal(np.array([], dtype=np.complex128))
+        if currentLength == 1:
+            return DiscreteSignal(np.full(new_length, self.data[0], dtype=np.complex128))
+
+        extended = np.concatenate([self.data, self.data[:1]])
+        oldIndices = np.arange(currentLength+1, dtype=np.float64)
+        newIndices = np.linspace(0, currentLength, new_length, endpoint=False)
+        realInterpolated = np.interp(newIndices, oldIndices, extended.real)
+        imagInterpolated = np.interp(newIndices, oldIndices, extended.imag)
         return DiscreteSignal(realInterpolated+1j*imagInterpolated)
 
 
