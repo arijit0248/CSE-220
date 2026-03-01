@@ -1,6 +1,6 @@
 import tkinter as tk
 import numpy as np
-from discrete_framework import DiscreteSignal, DFTAnalyzer, FastFourierTransform
+from discrete_framework import DiscreteSignal, DFTAnalyzer, FastFourierTransform, BluesteinFFT
 
 
 class DoodlingApp:
@@ -102,12 +102,12 @@ class DoodlingApp:
         signal = DiscreteSignal(complexData)
         # 2. Select Algorithm
         if self.use_fft.get():
-            analyzer = FastFourierTransform()
-            N = len(signal)
-            power = 1
-            while power < N:
-                power <<= 1
-            signal = signal.interpolate(power)
+            analyzer = BluesteinFFT()
+            # N = len(signal)
+            # power = 1
+            # while power < N:
+            #     power <<= 1
+            # signal = signal.interpolate(power)
 
         else:
             analyzer = DFTAnalyzer()

@@ -4,7 +4,7 @@ import numpy as np
 import scipy.io.wavfile as wav
 import sounddevice as sd
 import threading
-from discrete_framework import DFTAnalyzer, FastFourierTransform, DiscreteSignal
+from discrete_framework import DFTAnalyzer, FastFourierTransform, DiscreteSignal, BluesteinFFT
 
 
 class AudioEqualizer:
@@ -106,8 +106,9 @@ class AudioEqualizer:
 
         def worker():
             if self.use_fft.get():
-                analyzer = FastFourierTransform()
-                chunkSize = 2048
+                analyzer = BluesteinFFT()
+                # chunkSize = 2048
+                chunkSize = 1024
             else:
                 analyzer = DFTAnalyzer()
                 chunkSize = 1024
